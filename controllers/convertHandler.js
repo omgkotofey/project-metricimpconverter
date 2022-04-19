@@ -70,14 +70,15 @@ function ConvertHandler() {
     if (!matches) {
       return 1;
     }
-
     const result = matches.shift();
+    
     // for '4//' or '4..' or '4/.'
-    if (result.match(/[\/\.]{1}/g).length > 1) {
+    const delimeters = result.match(/[\/\.]/g);
+    if (delimeters && delimeters.length > 1) {
       throw new Error('Invalid number');
     }
     
-    return result;
+    return parseFloat(result);
   };
   
   this.getUnit = function(input) {
@@ -93,15 +94,30 @@ function ConvertHandler() {
     return findConverConfig(initUnit).to.short;
   };
 
-  this.convert = function(initNum, initUnit) {    
-    return initNum * findConverConfig(initUnit).ratio;
+  this.convertValue = function(initNum, initUnit) {    
+    return +(initNum * findConverConfig(initUnit).ratio).toFixed(5);
   };
   
   this.getString = function(initNum, initUnit, returnNum) {
     const convertConfig = findConverConfig(initUnit);
-    
     return `${initNum} ${convertConfig.verbose} converts to ${returnNum} ${convertConfig.to.verbose}`;
   };
+
+  this.convertInput = function(input) {
+    const inputNum = this.getNum(input);
+    const inputUnit = this.getUnit(input);
+    const convertedNum = this.convertValue(inputNum, inputUnit);
+    const convertedNumUnit = this.getReturnUnit(inputUnit);
+    const string = this.getString(inputNum, inputUnit, convertedNum);
+
+    return {
+        initNum: inputNum, 
+        initUnit: inputUnit, 
+        returnNum: convertedNum, 
+        returnUnit: convertedNumUnit, 
+        string: string
+      };
+  }
   
 }
 
