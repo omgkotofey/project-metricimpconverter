@@ -1,11 +1,11 @@
 const UnitLib = {
   gal: {
     short: 'gal',
-    verbose: 'gallones',
+    verbose: 'gallons',
   },
   km: {
     short: 'km',
-    verbose: 'kilometres',
+    verbose: 'kilometers',
   },
   mi: {
     short: 'mi',
@@ -15,7 +15,11 @@ const UnitLib = {
     short: 'lbs',
     verbose: 'pounds',
   },
-  L: {
+  kg: {
+    short: 'kg',
+    verbose: 'kilograms',
+  },
+  l: {
     short: 'L',
     verbose: 'liters',
   },
@@ -26,7 +30,7 @@ function ConvertHandler() {
   const convertUnits = {
     gal: {
       ...UnitLib.gal,
-      to: UnitLib.L,
+      to: UnitLib.l,
       ratio: 3.78541,
     },
     mi: {
@@ -39,26 +43,26 @@ function ConvertHandler() {
       to: UnitLib.kg,
       ratio: 0.453592,
     },
-    L: {
-      ...UnitLib.L,
+    l: {
+      ...UnitLib.l,
       to: UnitLib.gal,
       ratio: 0.264172,
     },
     km: {
       ...UnitLib.km,
       to: UnitLib.mi,
-      ratio: 0.621371,
+      ratio: 0.621373,
     },
     kg: {
       ...UnitLib.kg,
       to: UnitLib.lbs,
-      ratio: 2.204622,
+      ratio: 2.204624,
     }
   }
 
-  const findConverConfig = (unitName) => {
+  const findConvertConfig = (unitName) => {
     if (!convertUnits.hasOwnProperty(unitName)) {
-      throw new Error('Invalid unit');
+      throw new Error('invalid unit');
     }
 
     return convertUnits[unitName];
@@ -67,16 +71,23 @@ function ConvertHandler() {
   this.getNum = function(input) {
     // like '1' or '1.5' or '3/2'
     let matches = input.match(/[\d\.\/]*/);
-    if (!matches) {
+    if (!matches || !matches.filter((item)=>!!item).length) {
       return 1;
     }
     const result = matches.shift();
     
     // for '4//' or '4..' or '4/.'
     const delimeters = result.match(/[\/\.]/g);
-    if (delimeters && delimeters.length > 1) {
-      throw new Error('Invalid number');
-    }
+    if (delimeters) {
+      if (result.includes('..') || result.includes('//')) {
+        throw new Error('invalid number');
+      }
+
+      if (delimeters.includes('/')) {
+        const parts = result.split('/');
+        return parts[0] / parts[1];
+      }
+    } 
     
     return parseFloat(result);
   };
@@ -84,35 +95,61 @@ function ConvertHandler() {
   this.getUnit = function(input) {
     // like 'km' or 'l'
     let matches = input.match(/\D+$/);
-    if (!matches) {
-      throw new Error('Invalid unit');
+    if (!matches || !matches.length) {
+      throw new Error('invalid unit');
     }
-    return matches.shift();
-  };
-  
-  this.getReturnUnit = function(initUnit) {
-    return findConverConfig(initUnit).to.short;
+    return matches.shift().toLowerCase();
   };
 
-  this.convertValue = function(initNum, initUnit) {    
-    return +(initNum * findConverConfig(initUnit).ratio).toFixed(5);
+  this.parseInput = function(input) {
+    let errors = [];
+    const parseResult = {};
+
+    try {
+      parseResult.inputNum = this.getNum(input);
+    } catch (e) {
+      errors.push(e);
+    }
+
+    try {
+      parseResult.convertConfig = findConvertConfig(this.getUnit(input));
+    } catch (e) {
+      errors.push(e);
+    }
+
+    errors = errors.filter(item => !!item);
+    if (!errors.length) {
+      return parseResult;
+    }
+    if (errors.length == 2) {
+      throw new Error('invalid number and unit');
+    }
+
+    throw errors[0];
+  }
+  
+  this.getReturnUnit = function(convertConfig) {
+    return convertConfig.to.short;
+  };
+
+  this.convertValue = function(initNum, convertConfig) {    
+    return +(initNum * convertConfig.ratio).toFixed(5);
   };
   
-  this.getString = function(initNum, initUnit, returnNum) {
-    const convertConfig = findConverConfig(initUnit);
+  this.getString = function(initNum, convertConfig, returnNum) {
     return `${initNum} ${convertConfig.verbose} converts to ${returnNum} ${convertConfig.to.verbose}`;
   };
 
   this.convertInput = function(input) {
-    const inputNum = this.getNum(input);
-    const inputUnit = this.getUnit(input);
-    const convertedNum = this.convertValue(inputNum, inputUnit);
-    const convertedNumUnit = this.getReturnUnit(inputUnit);
-    const string = this.getString(inputNum, inputUnit, convertedNum);
+    const { inputNum, convertConfig } = this.parseInput(input);
+    
+    const convertedNum = this.convertValue(inputNum, convertConfig);
+    const convertedNumUnit = this.getReturnUnit(convertConfig);
+    const string = this.getString(inputNum, convertConfig, convertedNum);
 
     return {
         initNum: inputNum, 
-        initUnit: inputUnit, 
+        initUnit: convertConfig.short, 
         returnNum: convertedNum, 
         returnUnit: convertedNumUnit, 
         string: string
